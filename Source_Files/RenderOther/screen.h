@@ -106,6 +106,7 @@ namespace alephone
 		SDL_Rect map_rect();
 		SDL_Rect term_rect();
 		SDL_Rect hud_rect();
+		SDL_Rect intro_rect();
 		SDL_Rect OpenGLViewPort();
 
 		void bound_screen(bool in_game = true);

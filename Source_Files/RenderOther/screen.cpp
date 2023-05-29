@@ -502,6 +502,27 @@ SDL_Rect Screen::hud_rect()
 	return r;
 }
 
+SDL_Rect Screen::intro_rect()
+{
+#ifdef FORCE_MENU_RESOLUTION
+	SDL_Rect r;
+	r.w = 640;
+	r.h = 480;
+	r.x = 0;
+	r.y = 0;
+
+	return r;
+#else
+	SDL_Rect r;
+	r.w = std::min(window_width(), std::max(640, 4 * window_height() / 3));
+	r.h = window_height();
+	r.x = (width() - r.w) / 2;
+	r.y = window_height() - r.h + (height() - window_height()) / 2;
+
+	return r;
+#endif
+}
+
 void Screen::bound_screen(bool in_game)
 {
 	SDL_Rect r = { 0, 0, in_game ? window_width() : 640, in_game ? window_height() : 480 };
@@ -556,33 +577,35 @@ void Screen::scissor_screen_to_rect(SDL_Rect &r)
 
 void Screen::window_to_screen(int &x, int &y)
 {
-#ifdef HAVE_OPENGL
-	if (MainScreenIsOpenGL())
-	{
-		int winw = MainScreenWindowWidth();
-		int winh = MainScreenWindowHeight();
-		int virw = 640;
-		int virh = 480;
-		
-		float wina = winw / static_cast<float>(winh);
-		float vira = virw / static_cast<float>(virh);
+	int winw = MainScreenLogicalWidth();
+	int winh = MainScreenLogicalHeight();
 
-		if (wina >= vira)
-		{
-			float scale = winh / static_cast<float>(virh);
-			x -= (winw - (virw * scale))/2;
-			x /= scale;
-			y /= scale;
-		}
-		else
-		{
-			float scale = winw / static_cast<float>(virw);
-			y -= (winh - (virh * scale))/2;
-			x /= scale;
-			y /= scale;
-		}
+#ifdef HAVE_OPENGL
+	if (MainScreenIsOpenGL()) {
+		winw = MainScreenWindowWidth();
+		winh = MainScreenWindowHeight();
 	}
 #endif
+	int virw = 640;
+	int virh = 480;
+	
+	float wina = winw / static_cast<float>(winh);
+	float vira = virw / static_cast<float>(virh);
+
+	if (wina >= vira)
+	{
+		float scale = winh / static_cast<float>(virh);
+		x -= (winw - (virw * scale))/2;
+		x /= scale;
+		y /= scale;
+	}
+	else
+	{
+		float scale = winw / static_cast<float>(virw);
+		y -= (winh - (virh * scale))/2;
+		x /= scale;
+		y /= scale;
+	}
 }
 
 /*
@@ -850,11 +873,13 @@ static void change_screen_mode(int width, int height, int depth, bool nogl, bool
 	
 	int sdl_width = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : vmode_width;
 	int sdl_height = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : vmode_height;
+#ifdef FORCE_MENU_RESOLUTION
 	if (force_menu)
 	{
 		vmode_width = 640;
 		vmode_height = 480;
 	}
+#endif
 	
 //#ifdef HAVE_OPENGL
 //	if (!context_created && !nogl && screen_mode.acceleration != _no_acceleration) {
@@ -1171,13 +1196,17 @@ void change_screen_mode(struct screen_mode_data *mode, bool redraw, bool resize_
 	if (redraw) {
 		short w = std::max(mode->width, static_cast<short>(640));
 		short h = std::max(mode->height, static_cast<short>(480));
+#ifdef FORCE_MENU_RESOLUTION
 		if (!in_game)
 		{
 			w = 640;
 			h = 480;
 		}
 		else
+#endif
+		{
 			get_auto_resolution_size(&w, &h, mode);
+		}
 		change_screen_mode(w, h, mode->bit_depth, false, !in_game, resize_hud);
 		clear_screen();
 		recenter_mouse();
@@ -1192,15 +1221,24 @@ void change_screen_mode(short screentype)
 	
 	short w = std::max(mode->width, static_cast<short>(640));
 	short h = std::max(mode->height, static_cast<short>(480));
+#ifdef FORCE_MENU_RESOLUTION
 	if (screentype == _screentype_menu)
 	{
 		w = 640;
 		h = 480;
 	}
 	else
+#endif
+	{
 		get_auto_resolution_size(&w, &h, mode);
+	}
 	
+	
+#ifdef FORCE_MENU_RESOLUTION
 	bool force_menu_size = (screentype == _screentype_menu || screentype == _screentype_chapter);
+#else
+	bool force_menu_size = false;
+#endif
 	change_screen_mode(w, h, mode->bit_depth, false, force_menu_size);
 	clear_screen();
 	recenter_mouse();
@@ -2123,6 +2161,8 @@ void draw_intro_screen(void)
 			SDL_SetSurfaceBlendMode(Intro_Buffer_corrected, SDL_BLENDMODE_NONE);
 			s = Intro_Buffer_corrected;
 		}
+
+		dst_rect = Screen::instance()->intro_rect();
 		DrawSurface(s, dst_rect, src_rect);
 		intro_buffer_changed = false;
 	}
